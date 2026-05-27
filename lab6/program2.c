@@ -6,7 +6,7 @@
 #include <time.h>
 #include <unistd.h>
 
-// --- STRUKTURY DANYCH ---
+// struktury
 typedef struct {
   unsigned int frame_num;
   struct timespec timestamp;
@@ -17,20 +17,20 @@ typedef struct {
   struct timespec timestamp;
 } robot_state_t;
 
-// --- STRUKTURA BUFORA CYKLICZNEGO (FIFO) ---
+// bufor
 typedef struct {
   camera_frame_t *buffer;
-  int head;     // Skąd pobieramy
-  int tail;     // Gdzie wstawiamy
-  int count;    // Aktualna liczba elementów
-  int capacity; // Maksymalna pojemność
+  int head;     // skad
+  int tail;     // gdzie
+  int count;    // ile
+  int capacity; // max
 
   pthread_mutex_t mutex;
-  pthread_cond_t cond_not_empty; // Sygnał: "Są nowe dane, można pobierać"
-  pthread_cond_t cond_not_full; // Sygnał: "Zrobiło się miejsce, można wstawiać"
+  pthread_cond_t cond_not_empty; // sa dane
+  pthread_cond_t cond_not_full; // jest miejsce
 } frame_buffer_t;
 
-// --- ZMIENNE GLOBALNE ---
+// zmienne
 volatile sig_atomic_t keep_running = 1;
 
 frame_buffer_t left_buf;
@@ -40,19 +40,19 @@ frame_buffer_t sync_buf;
 robot_state_t global_robot_state;
 pthread_mutex_t robot_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-// Statystyki
+// staty
 long stat_frames_generated = 0;
 long stat_sync_pairs = 0;
 long stat_robot_data = 0;
 pthread_mutex_t stats_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-// --- OBSŁUGA SYGNAŁU CTRL+C ---
+// obsluga sygnalu ctrl+c
 void handle_sigint(int sig) {
   printf("\n[SYSTEM] Otrzymano sygnał CTRL+C. Trwa bezpieczne zamykanie...\n");
   keep_running = 0;
 }
 
-// --- FUNKCJE POMOCNICZE CZASU ---
+// czas
 double diff_ms(struct timespec *start, struct timespec *end) {
   double start_ms = (start->tv_sec * 1000.0) + (start->tv_nsec / 1000000.0);
   double end_ms = (end->tv_sec * 1000.0) + (end->tv_nsec / 1000000.0);
@@ -61,7 +61,7 @@ double diff_ms(struct timespec *start, struct timespec *end) {
 
 void sleep_ms(int ms) { usleep(ms * 1000); }
 
-// --- FUNKCJE BUFORA CYKLICZNEGO ---
+// bufor
 void buffer_init(frame_buffer_t *buf, int capacity) {
   buf->buffer = malloc(sizeof(camera_frame_t) * capacity);
   buf->head = 0;
@@ -80,16 +80,16 @@ void buffer_destroy(frame_buffer_t *buf) {
   pthread_cond_destroy(&buf->cond_not_full);
 }
 
-// Wrzucanie do bufora
+// do bufora
 bool buffer_push(frame_buffer_t *buf, camera_frame_t frame) {
   pthread_mutex_lock(&buf->mutex);
 
-  // Zmienne warunkowe zawsze sprawdzamy w pętli while!
+  // zmienne warunkowe zawsze sprawdzamy w petli while!
   while (buf->count == buf->capacity && keep_running) {
     pthread_cond_wait(&buf->cond_not_full, &buf->mutex);
   }
 
-  if (!keep_running) { // Jeśli zamykamy program, przerywamy
+  if (!keep_running) { // jesli zamykamy program, przerywamy
     pthread_mutex_unlock(&buf->mutex);
     return false;
   }
@@ -99,12 +99,12 @@ bool buffer_push(frame_buffer_t *buf, camera_frame_t frame) {
   buf->count++;
 
   pthread_cond_signal(
-      &buf->cond_not_empty); // Budzi wątek, który czeka na pobranie
+      &buf->cond_not_empty); // budzi watek, ktory czeka na pobranie
   pthread_mutex_unlock(&buf->mutex);
   return true;
 }
 
-// Pobieranie z bufora
+// z bufora
 bool buffer_pop(frame_buffer_t *buf, camera_frame_t *frame) {
   pthread_mutex_lock(&buf->mutex);
 
@@ -122,12 +122,12 @@ bool buffer_pop(frame_buffer_t *buf, camera_frame_t *frame) {
   buf->count--;
 
   pthread_cond_signal(
-      &buf->cond_not_full); // Budzi wątek, który chce wstawić, ale miał pełno
+      &buf->cond_not_full); // budzi watek, ktory chce wstawic, ale mial pelno
   pthread_mutex_unlock(&buf->mutex);
   return true;
 }
 
-// --- WĄTKI KAMER (~25 Hz) ---
+// watki kamer
 void *camera_thread(void *arg) {
   frame_buffer_t *my_buf = (frame_buffer_t *)arg;
   unsigned int counter = 0;
@@ -149,12 +149,12 @@ void *camera_thread(void *arg) {
   return NULL;
 }
 
-// --- WĄTEK SYNCHRONIZACJI ---
+// watek synchronizacji
 void *sync_thread(void *arg) {
   camera_frame_t left, right;
 
   while (keep_running) {
-    // Pobierz klatki z obu buforów
+    // pobierz klatki z obu buforow
     if (!buffer_pop(&left_buf, &left))
       break;
     if (!buffer_pop(&right_buf, &right))
@@ -164,8 +164,8 @@ void *sync_thread(void *arg) {
     if (diff < 0)
       diff = -diff;
 
-    if (diff < 20.0) { // Tolerancja 20 ms
-      // Zapisujemy tylko numer lewej do bufora synchronizacji dla uproszczenia
+    if (diff < 20.0) { // tol 20ms
+      // tylko lewa
       // zapisu
       if (!buffer_push(&sync_buf, left))
         break;
@@ -178,19 +178,19 @@ void *sync_thread(void *arg) {
   return NULL;
 }
 
-// --- WĄTEK ZAPISU OBRAZÓW (~10 Hz) ---
+// watek zapisu obrazow
 void *save_thread(void *arg) {
   camera_frame_t sync_frame;
   while (keep_running) {
     if (buffer_pop(&sync_buf, &sync_frame)) {
-      // Symulacja zapisu na dysk
+      // zapis na dysk
       sleep_ms(100);
     }
   }
   return NULL;
 }
 
-// --- WĄTEK STANU ROBOTA (~100 Hz) ---
+// watek stanu robota
 void *robot_thread(void *arg) {
   double pos = 0.0;
   while (keep_running) {
@@ -210,10 +210,10 @@ void *robot_thread(void *arg) {
   return NULL;
 }
 
-// --- WĄTEK STATYSTYK ---
+// watek statystyk
 void *stats_thread(void *arg) {
   while (keep_running) {
-    sleep_ms(2000); // Wyświetlaj co 2 sekundy
+    sleep_ms(2000); // wyswietlaj co 2 sekundy
     if (!keep_running)
       break;
 
@@ -228,22 +228,22 @@ void *stats_thread(void *arg) {
   return NULL;
 }
 
-// --- FUNKCJA GŁÓWNA ---
+// funkcja glowna
 int main() {
-  // Podpięcie sygnału CTRL+C
+  // podpiecie sygnalu ctrl+c
   signal(SIGINT, handle_sigint);
 
   printf("Uruchamianie systemu poziomu 2...\n");
   printf("Nacisnij CTRL+C aby bezpiecznie zamknac program.\n\n");
 
-  // Inicjalizacja buforów (pojemność np. 10 elementów)
+  // inicjalizacja buforow (pojemnosc np. 10 elementow)
   buffer_init(&left_buf, 10);
   buffer_init(&right_buf, 10);
   buffer_init(&sync_buf, 10);
 
   pthread_t t_cam_l, t_cam_r, t_sync, t_save, t_robot, t_stats;
 
-  // Przekazujemy adresy buforów jako argumenty do wątków kamer
+  // przekazujemy adresy buforow jako argumenty do watkow kamer
   pthread_create(&t_cam_l, NULL, camera_thread, &left_buf);
   pthread_create(&t_cam_r, NULL, camera_thread, &right_buf);
 
@@ -252,11 +252,11 @@ int main() {
   pthread_create(&t_robot, NULL, robot_thread, NULL);
   pthread_create(&t_stats, NULL, stats_thread, NULL);
 
-  // Czekamy na zakończenie wątków (nastąpi to po naciśnięciu CTRL+C)
-  // Jednak musimy wybudzić wątki, które utknęły czekając na dane!
-  pthread_join(t_stats, NULL); // Ten wątek na pewno się zamknie
+  // czekamy na zakonczenie watkow (nastapi to po nacisnieciu ctrl+c)
+  // jednak musimy wybudzic watki, ktore utknely czekajac na dane!
+  pthread_join(t_stats, NULL); // ten watek na pewno sie zamknie
 
-  // Budzenie wszystkich "śpiących" wątków w buforach
+  // budzenie wszystkich "spiacych" watkow w buforach
   pthread_cond_broadcast(&left_buf.cond_not_empty);
   pthread_cond_broadcast(&left_buf.cond_not_full);
   pthread_cond_broadcast(&right_buf.cond_not_empty);
@@ -270,7 +270,7 @@ int main() {
   pthread_join(t_save, NULL);
   pthread_join(t_robot, NULL);
 
-  // Sprzątanie pamięci
+  // sprzatanie pamieci
   buffer_destroy(&left_buf);
   buffer_destroy(&right_buf);
   buffer_destroy(&sync_buf);

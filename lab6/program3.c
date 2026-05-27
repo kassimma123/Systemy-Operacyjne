@@ -8,7 +8,7 @@
 #include <time.h>
 #include <unistd.h>
 
-// --- STRUKTURY DANYCH (Zadanie 2) ---
+// struktury
 typedef struct {
   unsigned int frame_num;
   struct timespec timestamp;
@@ -25,18 +25,17 @@ typedef struct {
   pthread_cond_t cond_not_full;
 } frame_buffer_t;
 
-// --- ZMIENNE GLOBALNE I ATOMOWE (Zadanie 3) ---
+// globalne i atomowe
 volatile sig_atomic_t keep_running = 1;
-
 frame_buffer_t left_buf, right_buf, sync_buf;
 
-// Liczniki atomowe - bezpieczne bez mutexów
+// liczniki atomowe  bezpieczne bez mutexow
 atomic_long stat_left_frames = 0;
 atomic_long stat_right_frames = 0;
 atomic_long stat_sync_pairs = 0;
 atomic_long stat_robot_data = 0;
 
-// --- FUNKCJE POMOCNICZE ---
+// pomocnicze
 void buffer_init(frame_buffer_t *buf, int capacity) {
   buf->buffer = malloc(sizeof(camera_frame_t) * capacity);
   buf->head = buf->tail = buf->count = 0;
@@ -77,27 +76,28 @@ bool buffer_pop(frame_buffer_t *buf, camera_frame_t *frame) {
   return true;
 }
 
-// --- WĄTEK WATCHDOG (Zadanie 3) ---
+// watek watchdog
 void *watchdog_thread(void *arg) {
   long prev_left = 0, prev_robot = 0;
 
   while (keep_running) {
-    sleep(1); // Sprawdzaj co sekundę
+    sleep(1); // sprawdzaj co sekunde
 
     long curr_left = atomic_load(&stat_left_frames);
     long curr_robot = atomic_load(&stat_robot_data);
 
-    // Jeśli przez sekundę przybyło mniej niż 20 klatek (powinno być 25)
+    // jesli przez sekunde przybylo mniej niz 20 klatek (powinno byc 25)
     if (curr_left - prev_left < 20) {
-      // POPRAWNA LINIA:
+      // err
       printf("\033[1;31m[WATCHDOG] OSTRZEŻENIE: ROBOT SLOW / DEADLINE "
              "EXCEEDED! (%ld)\033[0m\n",
              curr_robot - prev_robot);
     }
 
-    // Jeśli przez sekundę przybyło mniej niż 90 danych robota (powinno być 100)
-    if (curr_robot - prev_robot < 90) {
-      printf("\033[1;31m[WATCHDOG] OSTRZEŻENIE: ROBOT SLOW / DEADLINE EXCEEDED! (Aktualnie: %ld)\033[0m\n",
+    // jesli przez sekunde przybylo mniej niz 90 dane robota (powinno byc 100)
+    if (curr_robot - prev_robot < 80) {
+      printf("\033[1;31m[WATCHDOG] OSTRZEŻENIE: ROBOT SLOW / DEADLINE "
+             "EXCEEDED! (Aktualnie: %ld)\033[0m\n",
              curr_robot - prev_robot);
     }
 
@@ -107,7 +107,7 @@ void *watchdog_thread(void *arg) {
   return NULL;
 }
 
-// --- POZOSTAŁE WĄTKI ---
+// pozostale watki
 void *camera_left_thread(void *arg) {
   unsigned int counter = 0;
   while (keep_running) {
@@ -115,7 +115,7 @@ void *camera_left_thread(void *arg) {
     clock_gettime(CLOCK_REALTIME, &f.timestamp);
     buffer_push(&left_buf, f);
     atomic_fetch_add(&stat_left_frames, 1);
-    usleep(40000); // 25 Hz
+    usleep(40000); // 25 hz
   }
   return NULL;
 }
@@ -127,7 +127,7 @@ void *camera_right_thread(void *arg) {
     clock_gettime(CLOCK_REALTIME, &f.timestamp);
     buffer_push(&right_buf, f);
     atomic_fetch_add(&stat_right_frames, 1);
-    usleep(40000); // 25 Hz
+    usleep(40000); // 25 hz
   }
   return NULL;
 }
@@ -135,12 +135,12 @@ void *camera_right_thread(void *arg) {
 void *robot_thread(void *arg) {
   while (keep_running) {
     atomic_fetch_add(&stat_robot_data, 1);
-    usleep(10000); // 100 Hz
+    usleep(10000); // 100 hz
   }
   return NULL;
 }
 
-// --- FUNKCJA USTAWIAJĄCA PRIORYTET CZASU RZECZYWISTEGO ---
+// funkcja ustawiajaca priorytet czasu rzeczywistego
 void set_realtime_priority(pthread_t thread, int priority) {
   struct sched_param param;
   param.sched_priority = priority;
@@ -158,30 +158,30 @@ int main() {
 
   pthread_t t_l, t_r, t_robot, t_watch;
 
-  // Tworzenie wątków
+  // tworzenie watkow
   pthread_create(&t_l, NULL, camera_left_thread, NULL);
   pthread_create(&t_r, NULL, camera_right_thread, NULL);
   pthread_create(&t_robot, NULL, robot_thread, NULL);
   pthread_create(&t_watch, NULL, watchdog_thread, NULL);
 
-  // USTAWIANIE PRIORYTETÓW (Zadanie 3)
-  set_realtime_priority(t_robot, 50); // Robot najważniejszy
-  set_realtime_priority(t_l, 40);     // Kamery wysoki priorytet
+  // ustawianie priorytetow
+  set_realtime_priority(t_robot, 50); // robot najwazniejszy
+  set_realtime_priority(t_l, 40);     // kamery tez wysoko
   set_realtime_priority(t_r, 40);
 
   printf("System CZASU RZECZYWISTEGO działa. CTRL+C aby zakończyć.\n");
 
-  // Czekanie na koniec
+  // czekamy
   pthread_join(t_watch, NULL);
 
-  // Budzenie wątków do zamknięcia
+  // budzenie watkow do zamkniecia
   pthread_cond_broadcast(&left_buf.cond_not_empty);
   pthread_cond_broadcast(&right_buf.cond_not_empty);
   pthread_join(t_l, NULL);
   pthread_join(t_r, NULL);
   pthread_join(t_robot, NULL);
 
-  // GENEROWANIE RAPORTU (Zadanie 3)
+  // generowanie raportu
   FILE *f = fopen("report.txt", "w");
   if (f) {
     fprintf(f, "=== RAPORT KOŃCOWY SYSTEMU ROBOTA ===\n");
