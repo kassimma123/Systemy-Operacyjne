@@ -49,10 +49,12 @@ int main(int argc, char *argv[]) {
     // 4. Wysłanie tekstu do serwera
     char message[100];
     snprintf(message, sizeof(message), "ZADANIE %d", liczba);
+    
+    printf("[Klient] Wysyłam do serwera: %s\n", message);
 
-    ssize_t bytes_sent = send(client_fd, message, strlen(message), 0);
+    ssize_t bytes_sent = write(client_fd, message, strlen(message));
     if (bytes_sent == -1) {
-        perror("Błąd podczas wysyłania (send)");
+        perror("Błąd podczas wysyłania (write)");
         close(client_fd);
         exit(EXIT_FAILURE);
     }
@@ -61,19 +63,18 @@ int main(int argc, char *argv[]) {
     char buffer[MAX_BUFFER];
     memset(buffer, 0, MAX_BUFFER);
 
-    ssize_t bytes_received = recv(client_fd, buffer, MAX_BUFFER - 1, 0);
+    ssize_t bytes_received = read(client_fd, buffer, MAX_BUFFER - 1);
     if (bytes_received > 0) {
-        // Wypisujemy odzyskaną wiadomość bezpośrednio z serwera (bez formatowania i znaków dodatkowych, jak kazał schemat)
+        // Wypisujemy odzyskaną wiadomość bezpośrednio z serwera 
         printf("%s", buffer);
         
-        // Jeżeli zależy nam na nowej linii (jeśli serwer by jej nie dodawał) to można ewentualnie tutaj dodać:
         if(buffer[bytes_received - 1] != '\n') {
             printf("\n");
         }
     } else if (bytes_received == 0) {
         printf("[Klient] Serwer zamknął połączenie, brak odpowiedzi.\n");
     } else {
-        perror("Błąd przy odbieraniu (recv)");
+        perror("Błąd przy odbieraniu (read)");
     }
 
     // 6. Zakończenie pracy klienta

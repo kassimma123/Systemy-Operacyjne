@@ -84,7 +84,7 @@ void buffer_destroy(frame_buffer_t *buf) {
 bool buffer_push(frame_buffer_t *buf, camera_frame_t frame) {
   pthread_mutex_lock(&buf->mutex);
 
-  // zmienne warunkowe zawsze sprawdzamy w petli while!
+  // zmienne warunkowe zawsze sprawdzamy w petli 
   while (buf->count == buf->capacity && keep_running) {
     pthread_cond_wait(&buf->cond_not_full, &buf->mutex);
   }

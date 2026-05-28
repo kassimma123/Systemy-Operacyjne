@@ -1,0 +1,4 @@
+=== RAPORT KOŃCOWY SYSTEMU ROBOTA ===
+Liczba klatek Lewa Kamera : 120
+Liczba klatek Prawa Kamera: 121
+Liczba danych Robota      : 427
